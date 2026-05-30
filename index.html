@@ -215,8 +215,11 @@ function onMotion(e) {
   } else if (tiltState === 'up' && flat > TILT_MIN) {
     tiltState = 'down';
     wordEl.textContent = "⬇️";
+    buzz(80);   // haptic confirm that the flip registered (Android; iOS Safari has no vibrate)
   }
 }
+
+function buzz(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
 
 /* ============ PER-WORD TIMER ============
    Every word gets WORD_SECONDS on screen. When it runs out we show
@@ -237,7 +240,7 @@ function startWordTimer() {
       clearInterval(timerId); timerId = null;
       wordEl.textContent = "⏰ Time's up!";
       gameEl.classList.add('timesup');
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      buzz([200, 100, 200]);
     }
   }, 1000);
 }
