@@ -189,40 +189,35 @@ const wordEl  = document.getElementById('word');
 const scoreEl = document.getElementById('score');
 function show(el){ [startEl,gameEl,doneEl].forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
 
-/* ============ TILT DETECTION ============
-   Phone held vertically to forehead -> verticality ~ 90 (UP zone)
-   Phone lowered toward horizontal    -> verticality small (DOWN zone)
-   A DOWN -> UP cycle loads a new word. Hysteresis avoids flicker.
-   The game is played in LANDSCAPE, where the lower/raise gesture shows up
-   on `gamma`; in portrait it shows up on `beta`. We pick the right axis
-   from the current screen angle so it works either way. */
-const UP_THRESHOLD = 60;    // verticality must exceed this to count as "up at forehead"
-const DOWN_THRESHOLD = 35;  // verticality must drop below this to count as "lowered"
-let tiltState = 'down';     // start 'down' so the first raise shows a word
-let orientationActive = false;
+/* ============ TILT DETECTION (gravity-based, gimbal-lock free) ============
+   We read the gravity vector from `devicemotion` and compute how "flat" the
+   screen is: the gravity component along the screen normal, normalised 0..1.
+     ~0 = screen is vertical  -> held flat at your forehead   (UP zone)
+     ~1 = screen faces up/down -> tilted/lowered to read it    (DOWN zone)
+   This works in ANY rotation (landscape OR portrait) and never hits the
+   gamma=±90 singularity that Euler angles do when the phone is held upright.
+   A DOWN -> UP cycle (lower it, then raise it back to your forehead) loads a
+   new word. Hysteresis (gap between the two thresholds) prevents flicker. */
+const VERTICAL_MAX = 0.45; // flatness below this = held upright at forehead
+const TILT_MIN     = 0.62; // flatness above this = lowered / tilted away
+let flat = 0;              // smoothed flatness, 0..1
+let tiltState = 'down';    // start 'down' so the first raise shows a word
+let motionActive = false;
 
-function deviceAngle() {
-  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
-  if (typeof window.orientation === 'number') return window.orientation;
-  return 0;
-}
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.z === null || a.z === undefined) return;
+  const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+  const mag = Math.sqrt(ax*ax + ay*ay + az*az) || 9.81;
+  const target = Math.abs(az) / mag;   // 0 = vertical, 1 = flat
+  flat = flat * 0.8 + target * 0.2;    // low-pass filter to kill jitter
 
-function onOrientation(e) {
-  const ang = deviceAngle();
-  const landscape = (ang === 90 || ang === -90 || ang === 270);
-  // In landscape the up/down lean lives on gamma; in portrait it lives on beta.
-  let v = landscape ? e.gamma : e.beta;
-  if (v === null || v === undefined) return;
-  // Normalise to 0..90 "verticality", regardless of front/back lean.
-  v = Math.abs(v);
-  if (v > 90) v = 180 - v;
-
-  if (tiltState === 'down' && v > UP_THRESHOLD) {
+  if (tiltState === 'down' && flat < VERTICAL_MAX) {
     tiltState = 'up';
     nextWord();
-  } else if (tiltState === 'up' && v < DOWN_THRESHOLD) {
+  } else if (tiltState === 'up' && flat > TILT_MIN) {
     tiltState = 'down';
-    wordEl.textContent = "⬆️";
+    wordEl.textContent = "⬇️";
   }
 }
 
@@ -238,27 +233,27 @@ function startTimer() {
 }
 function endRound() {
   if (timerId) { clearInterval(timerId); timerId = null; }
-  window.removeEventListener('deviceorientation', onOrientation);
-  orientationActive = false;
+  window.removeEventListener('devicemotion', onMotion);
+  motionActive = false;
   document.getElementById('doneScore').textContent = count;
   show(doneEl);
 }
 
 /* ============ START ============ */
 async function beginGame() {
-  buildDeck(); deckIdx = 0; count = 0; tiltState = 'down';
+  buildDeck(); deckIdx = 0; count = 0; tiltState = 'down'; flat = 0;
   show(gameEl);
   // Best-effort landscape lock (Android Chrome supports it; iOS Safari ignores it).
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) {}
   wordEl.textContent = "Turn sideways & raise to your forehead… ↔️";
   scoreEl.textContent = "0";
 
-  // iOS 13+ Safari: must request permission from a user gesture.
+  // iOS 13+ Safari: motion sensors need permission from a user gesture.
   let granted = true;
-  const DOE = window.DeviceOrientationEvent;
-  if (DOE && typeof DOE.requestPermission === 'function') {
+  const DME = window.DeviceMotionEvent;
+  if (DME && typeof DME.requestPermission === 'function') {
     try {
-      const res = await DOE.requestPermission();
+      const res = await DME.requestPermission();
       granted = (res === 'granted');
     } catch (err) {
       granted = false;
@@ -266,13 +261,18 @@ async function beginGame() {
   }
 
   if (granted) {
-    window.addEventListener('deviceorientation', onOrientation);
-    orientationActive = true;
-    // Fallback: if no orientation events arrive in 1.5s, enable tap mode.
-    let gotEvent = false;
-    const probe = () => { gotEvent = true; window.removeEventListener('deviceorientation', probe); };
-    window.addEventListener('deviceorientation', probe);
-    setTimeout(() => { if (!gotEvent) enableTapMode(); }, 1500);
+    window.addEventListener('devicemotion', onMotion);
+    motionActive = true;
+    // Fallback to tap mode if no usable motion data arrives in 1.5s.
+    let gotData = false;
+    const probe = (ev) => {
+      const a = ev.accelerationIncludingGravity;
+      if (a && a.z !== null && a.z !== undefined) {
+        gotData = true; window.removeEventListener('devicemotion', probe);
+      }
+    };
+    window.addEventListener('devicemotion', probe);
+    setTimeout(() => { if (!gotData) enableTapMode(); }, 1500);
   } else {
     enableTapMode();
   }
@@ -281,9 +281,9 @@ async function beginGame() {
 }
 
 function enableTapMode() {
-  if (orientationActive) {
-    window.removeEventListener('deviceorientation', onOrientation);
-    orientationActive = false;
+  if (motionActive) {
+    window.removeEventListener('devicemotion', onMotion);
+    motionActive = false;
   }
   document.getElementById('hint').textContent = "👆 Tap the screen for the next word";
   nextWord();
