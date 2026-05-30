@@ -212,7 +212,7 @@ function onMotion(e) {
   const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
   const mag = Math.sqrt(ax*ax + ay*ay + az*az) || 9.81;
   const target = Math.abs(az) / mag;   // 0 = vertical, 1 = flat
-  flat = flat * 0.8 + target * 0.2;    // low-pass filter to kill jitter
+  flat = flat * 0.5 + target * 0.5;    // light smoothing: fast response, wide gap absorbs jitter
 
   if (dbg) dbg.textContent = "tilt " + flat.toFixed(2) + " · " + tiltState;
 
