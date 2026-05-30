@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#7873f5" />
+<title>🧠 Headbands</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; width: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Comic Sans MS', system-ui, sans-serif;
+    background: #7873f5;
+    color: #fff;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 28px;
+    padding-top: env(safe-area-inset-top, 28px);
+    padding-bottom: env(safe-area-inset-bottom, 28px);
+  }
+  .screen.active { display: flex; }
+
+  /* ---- Start / setup screen ---- */
+  #start { background: linear-gradient(135deg, #ff6ec4, #7873f5); }
+  h1 { font-size: clamp(2.4rem, 9vw, 4rem); text-shadow: 3px 3px 0 rgba(0,0,0,.2); margin-bottom: 6px; }
+  .tag { font-size: clamp(1rem, 4vw, 1.3rem); opacity: .92; margin-bottom: 22px; }
+  .how {
+    background: rgba(255,255,255,.15);
+    border-radius: 20px;
+    padding: 16px 18px;
+    max-width: 420px;
+    font-size: clamp(.95rem, 3.6vw, 1.1rem);
+    line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  .how b { font-size: 1.1em; }
+
+  .cats { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 460px; margin-bottom: 24px; }
+  .cat {
+    font-family: inherit; font-size: clamp(.9rem, 3.4vw, 1.05rem); font-weight: bold;
+    padding: 12px 18px; border: 3px solid rgba(255,255,255,.6); border-radius: 50px;
+    background: rgba(255,255,255,.12); color: #fff; cursor: pointer; transition: all .12s ease;
+  }
+  .cat.sel { background: #fff; color: #7873f5; border-color: #fff; transform: scale(1.05); }
+
+  button.big {
+    font-family: inherit; font-weight: bold;
+    font-size: clamp(1.3rem, 5vw, 1.9rem);
+    padding: 20px 46px; border: none; border-radius: 50px; cursor: pointer; color: #fff;
+    background: #ff4081; box-shadow: 0 8px 0 #c2185b, 0 12px 22px rgba(0,0,0,.3);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  button.big:active { transform: translateY(6px); box-shadow: 0 2px 0 #c2185b, 0 4px 8px rgba(0,0,0,.3); }
+  .note { margin-top: 16px; font-size: .85rem; opacity: .8; max-width: 380px; }
+
+  /* ---- Game screen ---- */
+  #game { transition: background-color .25s ease; }
+  #word {
+    font-size: clamp(3rem, 16vw, 9rem);
+    font-weight: 900;
+    line-height: 1.05;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.18);
+    padding: 0 10px;
+    word-break: break-word;
+  }
+  #hint {
+    position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 22px);
+    text-align: center; font-size: clamp(1rem, 4vw, 1.3rem); opacity: .85; padding: 14px;
+  }
+  #score {
+    position: fixed; top: env(safe-area-inset-top, 16px); left: 0; right: 0;
+    text-align: center; font-size: 1.1rem; opacity: .85;
+  }
+  .flash-ok { background-color: #2ecc71 !important; }
+
+  /* ---- Done screen ---- */
+  #done { background: linear-gradient(135deg, #11998e, #38ef7d); }
+  #doneScore { font-size: clamp(3rem, 14vw, 7rem); font-weight: 900; margin: 10px 0; }
+</style>
+</head>
+<body>
+
+  <!-- START SCREEN -->
+  <section id="start" class="screen active">
+    <h1>🧠 Headbands</h1>
+    <div class="tag">Hold it to your forehead. No peeking! 😄</div>
+    <div class="how">
+      <b>How to play:</b><br>
+      1. Hold the phone flat against your <b>forehead</b> (screen facing your friends).<br>
+      2. They give you clues — guess the word!<br>
+      3. <b>Lower the phone down, then raise it back up</b> for a new word.
+    </div>
+    <div class="cats" id="cats"></div>
+    <button class="big" id="startBtn">▶️ Start Game</button>
+    <div class="note" id="startNote">On iPhone, tap “Allow” when asked for Motion &amp; Orientation access.</div>
+  </section>
+
+  <!-- GAME SCREEN -->
+  <section id="game" class="screen">
+    <div id="score"></div>
+    <div id="word">Get ready…</div>
+    <div id="hint">⬇️ Lower &amp; raise for next word ⬆️</div>
+  </section>
+
+  <!-- DONE SCREEN -->
+  <section id="done" class="screen">
+    <h1>⏰ Time!</h1>
+    <div>You went through</div>
+    <div id="doneScore">0</div>
+    <div>words! 🎉</div>
+    <button class="big" id="againBtn" style="margin-top:24px;background:#0984e3;box-shadow:0 8px 0 #056baf,0 12px 22px rgba(0,0,0,.3);">🔁 Play Again</button>
+  </section>
+
+<script>
+/* ============ WORD BANKS ============ */
+const DECKS = {
+  "🐶 Animals": ["Dog","Cat","Elephant","Penguin","Giraffe","Kangaroo","Octopus","Dolphin","Tiger","Monkey","Snake","Frog","Owl","Shark","Bee","Horse","Pig","Chicken","Crocodile","Hamster","Butterfly","Spider","Whale","Camel","Koala","Panda","Rhino","Hedgehog","Flamingo","Sloth","Bat","Crab","Squirrel","Peacock","Goat","Donkey","Lobster","Jellyfish","Zebra","Parrot"],
+  "🍕 Food": ["Pizza","Ice cream","Banana","Hot dog","Spaghetti","Popcorn","Watermelon","Pancakes","Donut","Taco","Cheese","Cupcake","French fries","Sushi","Hamburger","Cookie","Carrot","Pickle","Lollipop","Egg","Soup","Broccoli","Bacon","Waffle","Pretzel","Marshmallow","Cereal","Sandwich","Strawberry","Pineapple"],
+  "🏃 Actions": ["Jumping","Sneezing","Sleeping","Dancing","Swimming","Laughing","Crying","Tickling","Yawning","Hopping","Clapping","Snoring","Skipping","Whistling","Tiptoeing","Stretching","Juggling","Marching","Cartwheel","Sword fight","Brushing teeth","Tying shoes","Waving","Crawling","Spinning","Falling","Hiccups","Flexing","Bowing","Hugging"],
+  "🏠 Around the House": ["Toothbrush","Pillow","Spoon","Television","Refrigerator","Lamp","Toilet","Broom","Clock","Umbrella","Sock","Mirror","Blanket","Vacuum","Pencil","Scissors","Bucket","Soap","Towel","Kettle","Slippers","Remote","Hairdryer","Backpack","Crayon","Stapler","Door","Window","Bed","Couch"],
+  "🦸 Characters": ["Superhero","Pirate","Wizard","Ninja","Astronaut","Robot","Vampire","Mermaid","Dragon","Clown","Cowboy","Princess","Knight","Fairy","Ghost","Zombie","Alien","Witch","Dinosaur","Unicorn","Genie","Cyclops","Troll","Elf","Santa Claus","Tooth Fairy","Easter Bunny","Yeti","Cavemen","Scarecrow"],
+  "🌍 Places & Nature": ["Beach","Mountain","Rainbow","Volcano","Forest","Desert","Waterfall","Castle","Zoo","Playground","Farm","Island","Cave","River","Snow","Tornado","Jungle","Spaceship","Lighthouse","Campfire","Moon","Sun","Cloud","Star","Tree","Flower","Ocean","Bridge","Tent","Mud puddle"]
+};
+
+const allCats = Object.keys(DECKS);
+const selected = new Set(allCats); // all on by default
+const ROUND_SECONDS = 60;
+
+/* ============ CATEGORY UI ============ */
+const catsEl = document.getElementById('cats');
+allCats.forEach(name => {
+  const b = document.createElement('button');
+  b.className = 'cat sel';
+  b.textContent = name;
+  b.addEventListener('click', () => {
+    if (selected.has(name)) {
+      if (selected.size === 1) return; // keep at least one
+      selected.delete(name); b.classList.remove('sel');
+    } else {
+      selected.add(name); b.classList.add('sel');
+    }
+  });
+  catsEl.appendChild(b);
+});
+
+/* ============ DECK / WORD PICKING ============ */
+let deck = [];
+let count = 0;
+function buildDeck() {
+  deck = [];
+  selected.forEach(c => deck.push(...DECKS[c]));
+  // shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+}
+let deckIdx = 0;
+function nextWord() {
+  if (deckIdx >= deck.length) { buildDeck(); deckIdx = 0; }
+  const w = deck[deckIdx++];
+  wordEl.textContent = w;
+  count++;
+  scoreEl.textContent = count + (timerOn ? "   •   ⏱️ " + timeLeft + "s" : "");
+  // green flash so guessers know a fresh word loaded
+  gameEl.classList.add('flash-ok');
+  setTimeout(() => gameEl.classList.remove('flash-ok'), 220);
+}
+
+/* ============ SCREENS ============ */
+const startEl = document.getElementById('start');
+const gameEl  = document.getElementById('game');
+const doneEl  = document.getElementById('done');
+const wordEl  = document.getElementById('word');
+const scoreEl = document.getElementById('score');
+function show(el){ [startEl,gameEl,doneEl].forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
+
+/* ============ TILT DETECTION ============
+   Phone held vertically to forehead  -> beta ~ 90  (UP zone)
+   Phone lowered toward horizontal     -> beta small (DOWN zone)
+   A DOWN -> UP cycle loads a new word. Hysteresis avoids flicker. */
+const UP_THRESHOLD = 60;    // beta must exceed this to count as "up at forehead"
+const DOWN_THRESHOLD = 35;  // beta must drop below this to count as "lowered"
+let tiltState = 'down';     // start 'down' so the first raise shows a word
+let orientationActive = false;
+
+function onOrientation(e) {
+  if (e.beta === null || e.beta === undefined) return;
+  // Normalise: we care about how vertical the phone is, regardless of front/back lean.
+  let b = e.beta;
+  if (b > 90) b = 180 - b; // treat 90..180 (leaning past vertical) same as 90..0
+  if (b < -90) b = -180 - b;
+  b = Math.abs(b);
+
+  if (tiltState === 'down' && b > UP_THRESHOLD) {
+    tiltState = 'up';
+    nextWord();
+  } else if (tiltState === 'up' && b < DOWN_THRESHOLD) {
+    tiltState = 'down';
+    wordEl.textContent = "⬆️";
+  }
+}
+
+/* ============ TIMER (optional 60s round) ============ */
+let timerOn = false, timeLeft = ROUND_SECONDS, timerId = null;
+function startTimer() {
+  timerOn = true; timeLeft = ROUND_SECONDS;
+  timerId = setInterval(() => {
+    timeLeft--;
+    scoreEl.textContent = count + "   •   ⏱️ " + timeLeft + "s";
+    if (timeLeft <= 0) endRound();
+  }, 1000);
+}
+function endRound() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  window.removeEventListener('deviceorientation', onOrientation);
+  orientationActive = false;
+  document.getElementById('doneScore').textContent = count;
+  show(doneEl);
+}
+
+/* ============ START ============ */
+async function beginGame() {
+  buildDeck(); deckIdx = 0; count = 0; tiltState = 'down';
+  show(gameEl);
+  wordEl.textContent = "Raise to your forehead… ⬆️";
+  scoreEl.textContent = "0";
+
+  // iOS 13+ Safari: must request permission from a user gesture.
+  let granted = true;
+  const DOE = window.DeviceOrientationEvent;
+  if (DOE && typeof DOE.requestPermission === 'function') {
+    try {
+      const res = await DOE.requestPermission();
+      granted = (res === 'granted');
+    } catch (err) {
+      granted = false;
+    }
+  }
+
+  if (granted) {
+    window.addEventListener('deviceorientation', onOrientation);
+    orientationActive = true;
+    // Fallback: if no orientation events arrive in 1.5s, enable tap mode.
+    let gotEvent = false;
+    const probe = () => { gotEvent = true; window.removeEventListener('deviceorientation', probe); };
+    window.addEventListener('deviceorientation', probe);
+    setTimeout(() => { if (!gotEvent) enableTapMode(); }, 1500);
+  } else {
+    enableTapMode();
+  }
+
+  startTimer();
+}
+
+function enableTapMode() {
+  if (orientationActive) {
+    window.removeEventListener('deviceorientation', onOrientation);
+    orientationActive = false;
+  }
+  document.getElementById('hint').textContent = "👆 Tap the screen for the next word";
+  nextWord();
+  gameEl.addEventListener('click', nextWord);
+}
+
+document.getElementById('startBtn').addEventListener('click', beginGame);
+document.getElementById('againBtn').addEventListener('click', () => {
+  gameEl.removeEventListener('click', nextWord);
+  timerOn = false;
+  show(startEl);
+});
+</script>
+</body>
+</html>
