@@ -90,6 +90,13 @@
     position: fixed; left: 6px; bottom: 4px;
     font-family: monospace; font-size: .7rem; opacity: .5;
   }
+  #homeBtn {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 12px;
+    width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+    font-size: 1.3rem; line-height: 1; color: #fff; background: rgba(0,0,0,.28);
+    z-index: 60; font-family: inherit;
+  }
+  #homeBtn:active { background: rgba(0,0,0,.5); }
   #flash {
     position: fixed; inset: 0; background: #fff; opacity: 0;
     pointer-events: none; z-index: 50;
@@ -117,6 +124,7 @@
 
   <!-- GAME SCREEN -->
   <section id="game" class="screen">
+    <button id="homeBtn" aria-label="Back to menu">✕</button>
     <div id="score"></div>
     <div id="word">Get ready…</div>
     <div id="debug"></div>
@@ -345,7 +353,17 @@ function enableTapMode() {
   gameEl.addEventListener('click', nextWord);
 }
 
+function goHome() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  if (motionActive) { window.removeEventListener('devicemotion', onMotion); motionActive = false; }
+  gameEl.removeEventListener('click', nextWord); // tap-mode cleanup
+  gameEl.classList.remove('timesup');
+  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
+  show(startEl);
+}
+
 document.getElementById('startBtn').addEventListener('click', beginGame);
+document.getElementById('homeBtn').addEventListener('click', (e) => { e.stopPropagation(); goHome(); });
 </script>
 </body>
 </html>
