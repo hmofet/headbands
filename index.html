@@ -99,9 +99,10 @@
     <div class="tag">Hold it to your forehead. No peeking! 😄</div>
     <div class="how">
       <b>How to play:</b><br>
-      1. Hold the phone flat against your <b>forehead</b> (screen facing your friends).<br>
+      1. Turn your phone <b>sideways (landscape)</b> and hold it against your <b>forehead</b> (screen facing your friends).<br>
       2. They give you clues — guess the word!<br>
-      3. <b>Lower the phone down, then raise it back up</b> for a new word.
+      3. <b>Lower the phone down, then raise it back up</b> for a new word.<br>
+      You get <b>20 seconds</b> per round! ⏱️
     </div>
     <div class="cats" id="cats"></div>
     <button class="big" id="startBtn">▶️ Start Game</button>
@@ -117,7 +118,7 @@
 
   <!-- DONE SCREEN -->
   <section id="done" class="screen">
-    <h1>⏰ Time!</h1>
+    <h1>⏰ Time is over!</h1>
     <div>You went through</div>
     <div id="doneScore">0</div>
     <div>words! 🎉</div>
@@ -137,7 +138,7 @@ const DECKS = {
 
 const allCats = Object.keys(DECKS);
 const selected = new Set(allCats); // all on by default
-const ROUND_SECONDS = 60;
+const ROUND_SECONDS = 20;
 
 /* ============ CATEGORY UI ============ */
 const catsEl = document.getElementById('cats');
@@ -189,26 +190,37 @@ const scoreEl = document.getElementById('score');
 function show(el){ [startEl,gameEl,doneEl].forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
 
 /* ============ TILT DETECTION ============
-   Phone held vertically to forehead  -> beta ~ 90  (UP zone)
-   Phone lowered toward horizontal     -> beta small (DOWN zone)
-   A DOWN -> UP cycle loads a new word. Hysteresis avoids flicker. */
-const UP_THRESHOLD = 60;    // beta must exceed this to count as "up at forehead"
-const DOWN_THRESHOLD = 35;  // beta must drop below this to count as "lowered"
+   Phone held vertically to forehead -> verticality ~ 90 (UP zone)
+   Phone lowered toward horizontal    -> verticality small (DOWN zone)
+   A DOWN -> UP cycle loads a new word. Hysteresis avoids flicker.
+   The game is played in LANDSCAPE, where the lower/raise gesture shows up
+   on `gamma`; in portrait it shows up on `beta`. We pick the right axis
+   from the current screen angle so it works either way. */
+const UP_THRESHOLD = 60;    // verticality must exceed this to count as "up at forehead"
+const DOWN_THRESHOLD = 35;  // verticality must drop below this to count as "lowered"
 let tiltState = 'down';     // start 'down' so the first raise shows a word
 let orientationActive = false;
 
-function onOrientation(e) {
-  if (e.beta === null || e.beta === undefined) return;
-  // Normalise: we care about how vertical the phone is, regardless of front/back lean.
-  let b = e.beta;
-  if (b > 90) b = 180 - b; // treat 90..180 (leaning past vertical) same as 90..0
-  if (b < -90) b = -180 - b;
-  b = Math.abs(b);
+function deviceAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  if (typeof window.orientation === 'number') return window.orientation;
+  return 0;
+}
 
-  if (tiltState === 'down' && b > UP_THRESHOLD) {
+function onOrientation(e) {
+  const ang = deviceAngle();
+  const landscape = (ang === 90 || ang === -90 || ang === 270);
+  // In landscape the up/down lean lives on gamma; in portrait it lives on beta.
+  let v = landscape ? e.gamma : e.beta;
+  if (v === null || v === undefined) return;
+  // Normalise to 0..90 "verticality", regardless of front/back lean.
+  v = Math.abs(v);
+  if (v > 90) v = 180 - v;
+
+  if (tiltState === 'down' && v > UP_THRESHOLD) {
     tiltState = 'up';
     nextWord();
-  } else if (tiltState === 'up' && b < DOWN_THRESHOLD) {
+  } else if (tiltState === 'up' && v < DOWN_THRESHOLD) {
     tiltState = 'down';
     wordEl.textContent = "⬆️";
   }
@@ -236,7 +248,9 @@ function endRound() {
 async function beginGame() {
   buildDeck(); deckIdx = 0; count = 0; tiltState = 'down';
   show(gameEl);
-  wordEl.textContent = "Raise to your forehead… ⬆️";
+  // Best-effort landscape lock (Android Chrome supports it; iOS Safari ignores it).
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) {}
+  wordEl.textContent = "Turn sideways & raise to your forehead… ↔️";
   scoreEl.textContent = "0";
 
   // iOS 13+ Safari: must request permission from a user gesture.
