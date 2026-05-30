@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Headbands" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#7873f5" />
 <title>🧠 Headbands</title>
@@ -25,11 +27,13 @@
     display: none;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: safe center;
     text-align: center;
     padding: 28px;
     padding-top: env(safe-area-inset-top, 28px);
     padding-bottom: env(safe-area-inset-bottom, 28px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .screen.active { display: flex; }
 
@@ -69,26 +73,19 @@
   /* ---- Game screen ---- */
   #game { transition: background-color .25s ease; }
   #word {
-    font-size: clamp(3rem, 16vw, 9rem);
+    font-size: clamp(2rem, 11vmin, 5rem);
     font-weight: 900;
     line-height: 1.05;
     text-shadow: 2px 2px 0 rgba(0,0,0,.18);
     padding: 0 10px;
     word-break: break-word;
   }
-  #hint {
-    position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 22px);
-    text-align: center; font-size: clamp(1rem, 4vw, 1.3rem); opacity: .85; padding: 14px;
-  }
   #score {
     position: fixed; top: env(safe-area-inset-top, 16px); left: 0; right: 0;
     text-align: center; font-size: 1.1rem; opacity: .85;
   }
   .flash-ok { background-color: #2ecc71 !important; }
-
-  /* ---- Done screen ---- */
-  #done { background: linear-gradient(135deg, #11998e, #38ef7d); }
-  #doneScore { font-size: clamp(3rem, 14vw, 7rem); font-weight: 900; margin: 10px 0; }
+  .timesup { background-color: #e74c3c !important; }
 </style>
 </head>
 <body>
@@ -101,28 +98,17 @@
       <b>How to play:</b><br>
       1. Turn your phone <b>sideways (landscape)</b> and hold it against your <b>forehead</b> (screen facing your friends).<br>
       2. They give you clues — guess the word!<br>
-      3. <b>Lower the phone down, then raise it back up</b> for a new word.<br>
-      You get <b>20 seconds</b> per round! ⏱️
+      3. Each word lasts <b>20 seconds</b>. When time's up, <b>flip the phone down and back up</b> for the next word! ⏱️
     </div>
     <div class="cats" id="cats"></div>
     <button class="big" id="startBtn">▶️ Start Game</button>
-    <div class="note" id="startNote">On iPhone, tap “Allow” when asked for Motion &amp; Orientation access.</div>
+    <div class="note" id="startNote">On iPhone, tap “Allow” for Motion &amp; Orientation access. Tip: add to your Home Screen for full-screen play.</div>
   </section>
 
   <!-- GAME SCREEN -->
   <section id="game" class="screen">
     <div id="score"></div>
     <div id="word">Get ready…</div>
-    <div id="hint">⬇️ Lower &amp; raise for next word ⬆️</div>
-  </section>
-
-  <!-- DONE SCREEN -->
-  <section id="done" class="screen">
-    <h1>⏰ Time is over!</h1>
-    <div>You went through</div>
-    <div id="doneScore">0</div>
-    <div>words! 🎉</div>
-    <button class="big" id="againBtn" style="margin-top:24px;background:#0984e3;box-shadow:0 8px 0 #056baf,0 12px 22px rgba(0,0,0,.3);">🔁 Play Again</button>
   </section>
 
 <script>
@@ -138,7 +124,7 @@ const DECKS = {
 
 const allCats = Object.keys(DECKS);
 const selected = new Set(allCats); // all on by default
-const ROUND_SECONDS = 20;
+const WORD_SECONDS = 20;
 
 /* ============ CATEGORY UI ============ */
 const catsEl = document.getElementById('cats');
@@ -175,19 +161,19 @@ function nextWord() {
   const w = deck[deckIdx++];
   wordEl.textContent = w;
   count++;
-  scoreEl.textContent = count + (timerOn ? "   •   ⏱️ " + timeLeft + "s" : "");
   // green flash so guessers know a fresh word loaded
+  gameEl.classList.remove('timesup');
   gameEl.classList.add('flash-ok');
   setTimeout(() => gameEl.classList.remove('flash-ok'), 220);
+  startWordTimer();
 }
 
 /* ============ SCREENS ============ */
 const startEl = document.getElementById('start');
 const gameEl  = document.getElementById('game');
-const doneEl  = document.getElementById('done');
 const wordEl  = document.getElementById('word');
 const scoreEl = document.getElementById('score');
-function show(el){ [startEl,gameEl,doneEl].forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
+function show(el){ [startEl,gameEl].forEach(s=>s.classList.remove('active')); el.classList.add('active'); }
 
 /* ============ TILT DETECTION (gravity-based, gimbal-lock free) ============
    We read the gravity vector from `devicemotion` and compute how "flat" the
@@ -221,28 +207,41 @@ function onMotion(e) {
   }
 }
 
-/* ============ TIMER (optional 60s round) ============ */
-let timerOn = false, timeLeft = ROUND_SECONDS, timerId = null;
-function startTimer() {
-  timerOn = true; timeLeft = ROUND_SECONDS;
+/* ============ PER-WORD TIMER ============
+   Every word gets WORD_SECONDS on screen. When it runs out we show
+   "Time's up!" and wait — the player must flip the phone (lower then
+   raise) to load the next word, which resets the clock. */
+let timeLeft = WORD_SECONDS, timerId = null;
+function updateScore() {
+  scoreEl.textContent = count + "   •   ⏱️ " + Math.max(0, timeLeft) + "s";
+}
+function startWordTimer() {
+  if (timerId) clearInterval(timerId);
+  timeLeft = WORD_SECONDS;
+  updateScore();
   timerId = setInterval(() => {
     timeLeft--;
-    scoreEl.textContent = count + "   •   ⏱️ " + timeLeft + "s";
-    if (timeLeft <= 0) endRound();
+    updateScore();
+    if (timeLeft <= 0) {
+      clearInterval(timerId); timerId = null;
+      wordEl.textContent = "⏰ Time's up!";
+      gameEl.classList.add('timesup');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
   }, 1000);
-}
-function endRound() {
-  if (timerId) { clearInterval(timerId); timerId = null; }
-  window.removeEventListener('devicemotion', onMotion);
-  motionActive = false;
-  document.getElementById('doneScore').textContent = count;
-  show(doneEl);
 }
 
 /* ============ START ============ */
 async function beginGame() {
   buildDeck(); deckIdx = 0; count = 0; tiltState = 'down'; flat = 0;
   show(gameEl);
+  // Best-effort full screen (Android Chrome). On iPhone, "Add to Home Screen"
+  // gives true chrome-less play — the Fullscreen API isn't available there.
+  try {
+    const el = document.documentElement;
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } catch (e) {}
   // Best-effort landscape lock (Android Chrome supports it; iOS Safari ignores it).
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) {}
   wordEl.textContent = "Turn sideways & raise to your forehead… ↔️";
@@ -276,8 +275,6 @@ async function beginGame() {
   } else {
     enableTapMode();
   }
-
-  startTimer();
 }
 
 function enableTapMode() {
@@ -285,17 +282,11 @@ function enableTapMode() {
     window.removeEventListener('devicemotion', onMotion);
     motionActive = false;
   }
-  document.getElementById('hint').textContent = "👆 Tap the screen for the next word";
-  nextWord();
+  wordEl.textContent = "👆 Tap anywhere for words";
   gameEl.addEventListener('click', nextWord);
 }
 
 document.getElementById('startBtn').addEventListener('click', beginGame);
-document.getElementById('againBtn').addEventListener('click', () => {
-  gameEl.removeEventListener('click', nextWord);
-  timerOn = false;
-  show(startEl);
-});
 </script>
 </body>
 </html>
