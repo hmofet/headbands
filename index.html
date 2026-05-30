@@ -90,6 +90,12 @@
     position: fixed; left: 6px; bottom: 4px;
     font-family: monospace; font-size: .7rem; opacity: .5;
   }
+  #flash {
+    position: fixed; inset: 0; background: #fff; opacity: 0;
+    pointer-events: none; z-index: 50;
+  }
+  #flash.go { animation: flashfade .35s ease; }
+  @keyframes flashfade { 0% { opacity: .92; } 100% { opacity: 0; } }
 </style>
 </head>
 <body>
@@ -115,6 +121,7 @@
     <div id="word">Get ready…</div>
     <div id="debug"></div>
   </section>
+  <div id="flash"></div>
 
 <script>
 /* ============ WORD BANKS ============ */
@@ -215,11 +222,48 @@ function onMotion(e) {
   } else if (tiltState === 'up' && flat > TILT_MIN) {
     tiltState = 'down';
     wordEl.textContent = "⬇️";
-    buzz(80);   // haptic confirm that the flip registered (Android; iOS Safari has no vibrate)
+    flipFeedback();   // confirm the flip registered: buzz (Android) + click + flash (all)
   }
 }
 
 function buzz(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+/* ---- Flip feedback: haptic (Android), click sound, and screen flash ---- */
+const flashEl = document.getElementById('flash');
+let audioCtx = null;
+function initAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC && !audioCtx) audioCtx = new AC();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {}
+}
+function playClick() {
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(880, t);
+    o.frequency.exponentialRampToValueAtTime(440, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + 0.2);
+  } catch (e) {}
+}
+function flashScreen() {
+  flashEl.classList.remove('go');
+  void flashEl.offsetWidth; // restart the animation
+  flashEl.classList.add('go');
+}
+function flipFeedback() {
+  buzz(80);
+  playClick();
+  flashScreen();
+}
 
 /* ============ PER-WORD TIMER ============
    Every word gets WORD_SECONDS on screen. When it runs out we show
@@ -247,6 +291,7 @@ function startWordTimer() {
 
 /* ============ START ============ */
 async function beginGame() {
+  initAudio(); // must run inside the Start tap (user gesture) so iOS unlocks audio
   buildDeck(); deckIdx = 0; count = 0; tiltState = 'down'; flat = 0;
   show(gameEl);
   // Best-effort full screen (Android Chrome). On iPhone, "Add to Home Screen"
