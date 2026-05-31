@@ -69,6 +69,12 @@
   }
   button.big:active { transform: translateY(6px); box-shadow: 0 2px 0 #c2185b, 0 4px 8px rgba(0,0,0,.3); }
   .note { margin-top: 16px; font-size: .85rem; opacity: .8; max-width: 380px; }
+  .other-game {
+    display: inline-block; margin-top: 20px; padding: 11px 22px; border-radius: 50px;
+    background: rgba(255,255,255,.18); color: #fff; text-decoration: none; font-weight: bold;
+    font-size: clamp(.9rem, 3.4vw, 1.05rem); border: 2px solid rgba(255,255,255,.5);
+  }
+  .other-game:active { background: rgba(255,255,255,.32); }
 
   /* ---- Game screen ---- */
   #game { transition: background-color .25s ease; }
@@ -127,6 +133,7 @@
     <div class="cats" id="cats"></div>
     <button class="big" id="startBtn">▶️ Start Game</button>
     <div class="note" id="startNote">On iPhone, tap “Allow” for Motion &amp; Orientation access. Tip: add to your Home Screen for full-screen play.</div>
+    <a class="other-game" href="https://hmofet.github.io/act-it-out/">🎭 Try our other game: Act It Out →</a>
   </section>
 
   <!-- GAME SCREEN -->
