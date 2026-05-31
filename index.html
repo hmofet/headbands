@@ -9,6 +9,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#7873f5" />
 <title>🧠 Headbands</title>
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; width: 100%; overflow: hidden; }
@@ -92,10 +96,6 @@
   }
   .flash-ok { background-color: #2ecc71 !important; }
   .timesup { background-color: #e74c3c !important; }
-  #debug {
-    position: fixed; left: 6px; bottom: 4px;
-    font-family: monospace; font-size: .7rem; opacity: .5;
-  }
   #homeBtn {
     position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 12px;
     width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
@@ -142,7 +142,6 @@
     <button id="muteBtn" aria-label="Mute sound">🔊</button>
     <div id="score"></div>
     <div id="word">Get ready…</div>
-    <div id="debug"></div>
   </section>
   <div id="flash"></div>
 
@@ -227,7 +226,6 @@ const TILT_MIN     = 0.80; // flatness above this = tilted well down (trigger)
 let flat = 0;              // smoothed flatness, 0..1
 let tiltState = 'down';    // start 'down' so the first raise shows a word
 let motionActive = false;
-const dbg = document.getElementById('debug');
 
 function onMotion(e) {
   const a = e.accelerationIncludingGravity;
@@ -236,8 +234,6 @@ function onMotion(e) {
   const mag = Math.sqrt(ax*ax + ay*ay + az*az) || 9.81;
   const target = Math.abs(az) / mag;   // 0 = vertical, 1 = flat
   flat = flat * 0.5 + target * 0.5;    // light smoothing: fast response, wide gap absorbs jitter
-
-  if (dbg) dbg.textContent = "tilt " + flat.toFixed(2) + " · " + tiltState;
 
   if (tiltState === 'down' && flat < VERTICAL_MAX) {
     tiltState = 'up';
