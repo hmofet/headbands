@@ -87,8 +87,8 @@
     word-break: break-word;
   }
   #score {
-    position: fixed; top: env(safe-area-inset-top, 16px); left: 0; right: 0;
-    text-align: center; font-size: 1.1rem; opacity: .85;
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 0; right: 0;
+    text-align: center; font-size: clamp(1.8rem, 8vmin, 3.4rem); font-weight: 900; opacity: .9;
   }
   .flash-ok { background-color: #2ecc71 !important; }
   .timesup { background-color: #e74c3c !important; }
@@ -354,7 +354,7 @@ function flipFeedback() {
    raise) to load the next word, which resets the clock. */
 let timeLeft = WORD_SECONDS, timerId = null;
 function updateScore() {
-  scoreEl.textContent = count + "   •   ⏱️ " + Math.max(0, timeLeft) + "s";
+  scoreEl.textContent = "⏱️ " + Math.max(0, timeLeft) + "s";
 }
 function startWordTimer() {
   if (timerId) clearInterval(timerId);
@@ -390,7 +390,7 @@ async function beginGame() {
   // Best-effort landscape lock (Android Chrome supports it; iOS Safari ignores it).
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) {}
   wordEl.textContent = "Turn sideways & raise to your forehead… ↔️";
-  scoreEl.textContent = "0";
+  scoreEl.textContent = "";
 
   // iOS 13+ Safari: motion sensors need permission from a user gesture.
   let granted = true;
